@@ -291,6 +291,10 @@
     let memoryPositions = [];
     let selectedMemoryPositions = [];
 
+    // Position task variables (for scroll condition)
+    let originalTargetPosition = { x: 0, y: 0 };
+    let searchAreaDimensions = { width: 0, height: 0 };
+
     // Trial progress tracking variables
     let currentMainTrialNumber = 0;
     const totalMainTrials = 60; // 1 viewCondition × 2 structures × 15 trialsPerCondition × 2 blocks
@@ -655,29 +659,42 @@
         // Title
         html += '<h1 style="text-align: center; color: #2c3e50; margin-bottom: 40px; font-size: 28px; font-weight: bold;">ルール説明（よく読んで始めてください）</h1>';
         
-        // Operation flow overview
+        // Get view condition
+        const viewCondition = assignedViewCondition;
+        
+        // Operation flow overview - different for scroll condition
         html += '<div style="background-color: #f8f9fa; border: 3px solid #dee2e6; border-radius: 12px; padding: 25px; margin-bottom: 30px;">';
         html += '<h2 style="color: #495057; margin-top: 0; font-size: 22px; text-align: center;">実験の流れ</h2>';
         html += '<div style="display: flex; justify-content: space-between; align-items: center; margin: 20px 0; flex-wrap: wrap; gap: 15px;">';
-        html += '<div style="text-align: center; flex: 1; min-width: 120px; background-color: #fff3cd; padding: 15px; border-radius: 8px; border: 2px solid #ffeaa7;">';
+        html += '<div style="text-align: center; flex: 1; min-width: 100px; background-color: #fff3cd; padding: 15px; border-radius: 8px; border: 2px solid #ffeaa7;">';
         html += '<div style="background-color: #856404; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; font-weight: bold;">1</div>';
         html += '<strong>記憶課題</strong><br>位置を覚える';
         html += '</div>';
         html += '<div style="font-size: 24px; color: #6c757d;">→</div>';
-        html += '<div style="text-align: center; flex: 1; min-width: 120px; background-color: #d1ecf1; padding: 15px; border-radius: 8px; border: 2px solid #bee5eb;">';
+        html += '<div style="text-align: center; flex: 1; min-width: 100px; background-color: #d1ecf1; padding: 15px; border-radius: 8px; border: 2px solid #bee5eb;">';
         html += '<div style="background-color: #0c5460; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; font-weight: bold;">2</div>';
         html += '<strong>ターゲット確認</strong><br>図形を覚える';
         html += '</div>';
         html += '<div style="font-size: 24px; color: #6c757d;">→</div>';
-        html += '<div style="text-align: center; flex: 1; min-width: 120px; background-color: #e3f2fd; padding: 15px; border-radius: 8px; border: 2px solid #2196f3;">';
+        html += '<div style="text-align: center; flex: 1; min-width: 100px; background-color: #e3f2fd; padding: 15px; border-radius: 8px; border: 2px solid #2196f3;">';
         html += '<div style="background-color: #1976d2; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; font-weight: bold;">3</div>';
         html += '<strong>図形探索</strong><br>クリックで回答';
         html += '</div>';
         html += '<div style="font-size: 24px; color: #6c757d;">→</div>';
-        html += '<div style="text-align: center; flex: 1; min-width: 120px; background-color: #fff3cd; padding: 15px; border-radius: 8px; border: 2px solid #ffeaa7;">';
+        html += '<div style="text-align: center; flex: 1; min-width: 100px; background-color: #fff3cd; padding: 15px; border-radius: 8px; border: 2px solid #ffeaa7;">';
         html += '<div style="background-color: #856404; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; font-weight: bold;">4</div>';
         html += '<strong>記憶回答</strong><br>位置をクリック';
         html += '</div>';
+        
+        // Add position task step only for scroll condition
+        if (viewCondition === 'scroll') {
+          html += '<div style="font-size: 24px; color: #6c757d;">→</div>';
+          html += '<div style="text-align: center; flex: 1; min-width: 100px; background-color: #e8f5e8; padding: 15px; border-radius: 8px; border: 2px solid #4caf50;">';
+          html += '<div style="background-color: #2e7d32; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; font-weight: bold;">5</div>';
+          html += '<strong>位置課題</strong><br>ターゲット位置を回答';
+          html += '</div>';
+        }
+        
         html += '</div>';
         html += '<p style="text-align: center; font-size: 18px; margin: 15px 0; color: #dc3545; font-weight: bold;">この流れを何度も繰り返します</p>';
         html += '</div>';
@@ -773,10 +790,30 @@
         html += '</div>';
         html += '</div>';
         
+        // Position task explanation (scroll condition only)
+        if (viewCondition === 'scroll') {
+          html += '<div style="background-color: #e8f5e8; border: 2px solid #4caf50; border-radius: 8px; padding: 25px; margin-bottom: 30px;">';
+          html += '<h2 style="color: #2e7d32; margin-top: 0; font-size: 22px;">【ステップ5】位置課題</h2>';
+          html += '<div style="display: flex; gap: 30px; align-items: center; flex-wrap: wrap;">';
+          html += '<div style="flex: 1; min-width: 350px;">';
+          html += '<p style="font-size: 18px; margin: 15px 0;">最後に、見つけたターゲット図形が探索範囲全体のどのあたりにあったかを回答します。</p>';
+          html += '<p style="font-size: 16px; margin: 10px 0; color: #2e7d32;">画面に表示される白い四角は、探索範囲全体を縮小したものです。ターゲットがあった位置をクリックしてください。</p>';
+          html += '</div>';
+          html += '<div style="flex: 0 0 auto; text-align: center;">';
+          html += '<div style="width: 200px; height: 120px; background-color: white; border: 3px solid #333; display: flex; align-items: center; justify-content: center; margin: 0 auto;">';
+          html += '<div style="width: 15px; height: 15px; background-color: #007bff; border-radius: 50%;"></div>';
+          html += '</div>';
+          html += '<p style="font-size: 14px; color: #666; margin-top: 10px;">クリックで位置を回答</p>';
+          html += '</div>';
+          html += '</div>';
+          html += '</div>';
+        }
+        
         // Final emphasis on repetition and speed/accuracy
+        const numSteps = viewCondition === 'scroll' ? '5' : '4';
         html += '<div style="background-color: #e8f5e8; border: 3px solid #4caf50; border-radius: 12px; padding: 25px; margin-bottom: 30px; text-align: center;">';
         html += '<h3 style="color: #2e7d32; margin: 0 0 15px 0; font-size: 20px;">実験の進行について</h3>';
-        html += '<p style="font-size: 18px; margin: 10px 0; color: #2e7d32;">上記の4ステップを<strong>60回繰り返し</strong>ます。</p>';
+        html += `<p style="font-size: 18px; margin: 10px 0; color: #2e7d32;">上記の${numSteps}ステップを<strong>60回繰り返し</strong>ます。</p>`;
         html += '<p style="font-size: 18px; margin: 10px 0; color: #2e7d32;">すべての試行で<strong>できるだけ早く、正確に</strong>回答することを心がけてください。</p>';
         html += '<p style="font-size: 18px; margin: 10px 0; color: #2e7d32; font-weight: bold;">なお、後半30回では記憶課題がなくなり、楽に進めることができます。</p>';
         html += '<p style="font-size: 18px; margin: 10px 0; color: #2e7d32;">はじめに練習を数回行うので、やり方を確認してください。</p>';
@@ -820,19 +857,32 @@
         // Title
         html += '<h1 style="text-align: center; color: #2c3e50; margin-bottom: 40px; font-size: 28px; font-weight: bold;">ルール説明（よく読んで始めてください）</h1>';
         
+        // Get view condition
+        const viewCondition = assignedViewCondition;
+        
         // Operation flow overview (simplified for memory-second group)
         html += '<div style="background-color: #f8f9fa; border: 3px solid #dee2e6; border-radius: 12px; padding: 25px; margin-bottom: 30px;">';
         html += '<h2 style="color: #495057; margin-top: 0; font-size: 22px; text-align: center;">実験の流れ</h2>';
         html += '<div style="display: flex; justify-content: space-between; align-items: center; margin: 20px 0; flex-wrap: wrap; gap: 15px;">';
-        html += '<div style="text-align: center; flex: 1; min-width: 150px; background-color: #d1ecf1; padding: 15px; border-radius: 8px; border: 2px solid #bee5eb;">';
+        html += '<div style="text-align: center; flex: 1; min-width: 120px; background-color: #d1ecf1; padding: 15px; border-radius: 8px; border: 2px solid #bee5eb;">';
         html += '<div style="background-color: #0c5460; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; font-weight: bold;">1</div>';
         html += '<strong>ターゲット確認</strong><br>図形を覚える';
         html += '</div>';
         html += '<div style="font-size: 24px; color: #6c757d;">→</div>';
-        html += '<div style="text-align: center; flex: 1; min-width: 150px; background-color: #e3f2fd; padding: 15px; border-radius: 8px; border: 2px solid #2196f3;">';
+        html += '<div style="text-align: center; flex: 1; min-width: 120px; background-color: #e3f2fd; padding: 15px; border-radius: 8px; border: 2px solid #2196f3;">';
         html += '<div style="background-color: #1976d2; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; font-weight: bold;">2</div>';
         html += '<strong>図形探索</strong><br>クリックで回答';
         html += '</div>';
+        
+        // Add position task step only for scroll condition
+        if (viewCondition === 'scroll') {
+          html += '<div style="font-size: 24px; color: #6c757d;">→</div>';
+          html += '<div style="text-align: center; flex: 1; min-width: 120px; background-color: #e8f5e8; padding: 15px; border-radius: 8px; border: 2px solid #4caf50;">';
+          html += '<div style="background-color: #2e7d32; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; font-weight: bold;">3</div>';
+          html += '<strong>位置課題</strong><br>ターゲット位置を回答';
+          html += '</div>';
+        }
+        
         html += '</div>';
         html += '<p style="text-align: center; font-size: 18px; margin: 15px 0; color: #dc3545; font-weight: bold;">この流れを何度も繰り返します</p>';
         html += '</div>';
@@ -902,10 +952,30 @@
         }
         html += '</div>';
         
+        // Position task explanation (scroll condition only) for memory-second group
+        if (viewCondition === 'scroll') {
+          html += '<div style="background-color: #e8f5e8; border: 2px solid #4caf50; border-radius: 8px; padding: 25px; margin-bottom: 30px;">';
+          html += '<h2 style="color: #2e7d32; margin-top: 0; font-size: 22px;">【ステップ3】位置課題</h2>';
+          html += '<div style="display: flex; gap: 30px; align-items: center; flex-wrap: wrap;">';
+          html += '<div style="flex: 1; min-width: 350px;">';
+          html += '<p style="font-size: 18px; margin: 15px 0;">最後に、見つけたターゲット図形が探索範囲全体のどのあたりにあったかを回答します。</p>';
+          html += '<p style="font-size: 16px; margin: 10px 0; color: #2e7d32;">画面に表示される白い四角は、探索範囲全体を縮小したものです。ターゲットがあった位置をクリックしてください。</p>';
+          html += '</div>';
+          html += '<div style="flex: 0 0 auto; text-align: center;">';
+          html += '<div style="width: 200px; height: 120px; background-color: white; border: 3px solid #333; display: flex; align-items: center; justify-content: center; margin: 0 auto;">';
+          html += '<div style="width: 15px; height: 15px; background-color: #007bff; border-radius: 50%;"></div>';
+          html += '</div>';
+          html += '<p style="font-size: 14px; color: #666; margin-top: 10px;">クリックで位置を回答</p>';
+          html += '</div>';
+          html += '</div>';
+          html += '</div>';
+        }
+        
         // Final emphasis on repetition and speed/accuracy
+        const numSteps = viewCondition === 'scroll' ? '3' : '2';
         html += '<div style="background-color: #e8f5e8; border: 3px solid #4caf50; border-radius: 12px; padding: 25px; margin-bottom: 30px; text-align: center;">';
         html += '<h3 style="color: #2e7d32; margin: 0 0 15px 0; font-size: 20px;">実験の進行について</h3>';
-        html += '<p style="font-size: 18px; margin: 10px 0; color: #2e7d32;">上記の2ステップを<strong>60回繰り返し</strong>ます。</p>';
+        html += `<p style="font-size: 18px; margin: 10px 0; color: #2e7d32;">上記の${numSteps}ステップを<strong>60回繰り返し</strong>ます。</p>`;
         html += '<p style="font-size: 18px; margin: 10px 0; color: #2e7d32;">すべての試行で<strong>できるだけ早く、正確に</strong>回答することを心がけてください。</p>';
         html += '<p style="font-size: 18px; margin: 10px 0; color: #2e7d32;">はじめに練習を数回行うので、やり方を確認してください。</p>';
         html += '</div>';
@@ -1444,6 +1514,12 @@
         // Generate objects
         generateObjects(searchArea, targetColor, targetShape, structure, viewCondition, isPractice);
         
+        // Store original target position and search area dimensions for position task (scroll condition)
+        if (viewCondition === 'scroll') {
+          originalTargetPosition = { x: targetObject.x, y: targetObject.y };
+          searchAreaDimensions = { width: searchArea.width, height: searchArea.height };
+        }
+        
         // Initial draw
         drawSearchDisplay(ctx, viewCondition);
         
@@ -1786,7 +1862,12 @@
             total_movement: totalMovement,
             mouse_path: mousePath,
             task: 'visual_search',
-            is_practice: isPractice // Use captured value instead of jsPsych.timelineVariable('isPractice') || false
+            is_practice: isPractice, // Use captured value instead of jsPsych.timelineVariable('isPractice') || false
+            // Position task data (for scroll condition)
+            original_target_x: viewCondition === 'scroll' ? originalTargetPosition.x : null,
+            original_target_y: viewCondition === 'scroll' ? originalTargetPosition.y : null,
+            search_area_width: viewCondition === 'scroll' ? searchAreaDimensions.width : null,
+            search_area_height: viewCondition === 'scroll' ? searchAreaDimensions.height : null
           };
           
           // Only save data if not in practice mode
@@ -2099,6 +2180,164 @@
       }
     };
 
+    // Position task - for scroll condition only
+    // Displays a scaled-down representation of the search area and asks participants to click where they think the target was
+    const positionTask = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: function() {
+        // Get the last visual search trial data to retrieve the original target position
+        const searchData = jsPsych.data.get().filter({task: 'visual_search'}).last(1).values()[0];
+        
+        // Calculate scaled dimensions (approximately 80% of screen size for the display)
+        const scaleFactor = 0.5; // Scale down to 50% of original
+        const displayWidth = Math.floor(searchAreaDimensions.width * scaleFactor);
+        const displayHeight = Math.floor(searchAreaDimensions.height * scaleFactor);
+        
+        let html = '<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; box-sizing: border-box;">';
+        
+        // Instruction text above
+        html += '<div style="text-align: center; margin-bottom: 20px;">';
+        html += '<h2 style="color: #333; margin-bottom: 10px;">位置課題</h2>';
+        html += '<p style="font-size: 18px; color: #333; margin: 5px 0;">見つけたターゲットが、探索範囲全体のどの辺りにあったかを思い出してください。</p>';
+        html += '<p style="font-size: 18px; color: #333; margin: 5px 0;">下の白い四角の中で、ターゲットがあった位置をクリックしてください。</p>';
+        html += '</div>';
+        
+        // White rectangle representing the search area
+        html += `<div id="position-response-area" style="width: ${displayWidth}px; height: ${displayHeight}px; background-color: white; border: 3px solid #333; cursor: crosshair; position: relative; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">`;
+        html += '<div id="click-marker" style="display: none; position: absolute; width: 20px; height: 20px; background-color: #007bff; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none;"></div>';
+        html += '</div>';
+        
+        // Instruction text below
+        html += '<div style="text-align: center; margin-top: 20px;">';
+        html += '<p id="position-status" style="font-size: 16px; color: #666;">クリックして位置を選択してください</p>';
+        html += '<button id="position-submit-btn" style="padding: 12px 24px; font-size: 16px; background-color: #ccc; color: #666; border: none; border-radius: 5px; cursor: not-allowed; margin-top: 10px;" disabled>決定</button>';
+        html += '</div>';
+        
+        html += '</div>';
+        
+        return html;
+      },
+      choices: "NO_KEYS",
+      data: {
+        task: 'position_task'
+      },
+      on_load: function() {
+        const responseArea = document.getElementById('position-response-area');
+        const clickMarker = document.getElementById('click-marker');
+        const submitBtn = document.getElementById('position-submit-btn');
+        const statusText = document.getElementById('position-status');
+        
+        let selectedPosition = null;
+        const scaleFactor = 0.5;
+        
+        // Get the display area dimensions
+        const displayWidth = responseArea.offsetWidth;
+        const displayHeight = responseArea.offsetHeight;
+        
+        // Click event handler
+        responseArea.addEventListener('click', function(e) {
+          const rect = responseArea.getBoundingClientRect();
+          const clickX = e.clientX - rect.left;
+          const clickY = e.clientY - rect.top;
+          
+          // Store the selected position (in display coordinates)
+          selectedPosition = { x: clickX, y: clickY };
+          
+          // Show and position the click marker
+          clickMarker.style.display = 'block';
+          clickMarker.style.left = clickX + 'px';
+          clickMarker.style.top = clickY + 'px';
+          
+          // Enable submit button
+          submitBtn.disabled = false;
+          submitBtn.style.backgroundColor = '#007bff';
+          submitBtn.style.color = 'white';
+          submitBtn.style.cursor = 'pointer';
+          statusText.textContent = '位置が選択されました。決定ボタンを押してください。';
+        });
+        
+        // Submit button handler
+        submitBtn.addEventListener('click', function() {
+          if (selectedPosition) {
+            // Convert display coordinates back to original search area coordinates
+            const answeredX = selectedPosition.x / scaleFactor;
+            const answeredY = selectedPosition.y / scaleFactor;
+            
+            // Get the original target position
+            const originalX = originalTargetPosition.x;
+            const originalY = originalTargetPosition.y;
+            
+            // Calculate Euclidean distance
+            const dx = answeredX - originalX;
+            const dy = answeredY - originalY;
+            const euclideanDistance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Determine correctness based on distance threshold
+            // Threshold: 15% of the diagonal of the search area
+            const diagonalLength = Math.sqrt(
+              searchAreaDimensions.width * searchAreaDimensions.width + 
+              searchAreaDimensions.height * searchAreaDimensions.height
+            );
+            const correctThreshold = diagonalLength * 0.15;
+            const isCorrect = euclideanDistance <= correctThreshold;
+            
+            jsPsych.finishTrial({
+              answered_x: answeredX,
+              answered_y: answeredY,
+              original_target_x: originalX,
+              original_target_y: originalY,
+              euclidean_distance: euclideanDistance,
+              position_correct: isCorrect ? 1 : 0,
+              correct_threshold: correctThreshold
+            });
+          }
+        });
+      }
+    };
+
+    // Position task feedback
+    const positionFeedback = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: function() {
+        // Get the last position task data
+        const positionData = jsPsych.data.get().filter({task: 'position_task'}).last(1).values()[0];
+        const isCorrect = positionData.position_correct === 1;
+        
+        // Calculate current position task accuracy (excluding practice trials)
+        let positionAccuracyText = '';
+        const allPositionData = jsPsych.data.get().filter({task: 'position_task', is_practice: false});
+        
+        if (allPositionData.count() > 0) {
+          const positionScores = allPositionData.select('position_correct').values;
+          const validScores = positionScores.filter(score => score !== undefined && score !== null);
+          if (validScores.length > 0) {
+            const avgAccuracy = validScores.reduce((a, b) => a + b, 0) / validScores.length;
+            const accuracyPercent = Math.round(avgAccuracy * 100);
+            positionAccuracyText = `<p style="font-size: 16px; margin: 15px 0; color: #333;">現在の位置課題の成績：${accuracyPercent}%正解</p>`;
+          }
+        }
+        
+        return `
+          <h1>${isCorrect ? '正解!' : '不正解'}</h1>
+          ${positionAccuracyText}
+          <p>下の「次へ」ボタンをクリックして次に進みます。</p>
+          <div style="margin: 20px 0;">
+            <button id="position-feedback-next-btn" style="padding: 12px 24px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">次へ</button>
+          </div>
+        `;
+      },
+      data: {
+        task: 'position_feedback'
+      },
+      choices: "NO_KEYS",
+      on_load: function() {
+        const nextBtn = document.getElementById('position-feedback-next-btn');
+        nextBtn.addEventListener('click', function() {
+          jsPsych.finishTrial();
+        });
+      }
+    };
+
     // Result screen with overall score
     const resultScreen = {
       type: jsPsychHtmlKeyboardResponse,
@@ -2134,6 +2373,20 @@
           }
         }
         
+        // Calculate position task accuracy if applicable (scroll condition only)
+        let positionAccuracyText = '';
+        const positionScores = jsPsych.data.get().filter({task: 'position_task'}).select('position_correct').values;
+        
+        if (positionScores && positionScores.length > 0) {
+          // Filter out undefined values and calculate mean
+          const filteredPositionScores = positionScores.filter(score => score !== undefined && score !== null);
+          if (filteredPositionScores.length > 0) {
+            const avgPositionAccuracy = filteredPositionScores.reduce((a, b) => a + b, 0) / filteredPositionScores.length;
+            const positionAccuracy = Math.round(avgPositionAccuracy * 100);
+            positionAccuracyText = `<p style="font-size: 18px; margin: 15px 0;">位置記憶の正答率：${positionAccuracy}％</p>`;
+          }
+        }
+        
         return `
           <div style="max-width: 700px; margin: 0 auto; padding: 40px 20px; text-align: center; line-height: 1.6;">
             <h1 style="color: #2c3e50; margin-bottom: 30px;">お疲れ様でした！</h1>
@@ -2143,6 +2396,7 @@
               <p style="font-size: 18px; margin: 15px 0;">図形探しの正答率：${searchAccuracy}％</p>
               <p style="font-size: 18px; margin: 15px 0;">図形探しのスピード：平均${avgSearchTimeSeconds}秒</p>
               ${memoryAccuracyText}
+              ${positionAccuracyText}
             </div>
             
             <div style="background-color: #e7f3ff; padding: 25px; border-radius: 10px; margin: 30px 0; text-align: left;">
@@ -2415,6 +2669,25 @@
             return jsPsych.timelineVariable('memoryLoad') === 'with-memory';
           }
         },
+        // Position task only for scroll condition (after memory feedback)
+        {
+          timeline: [positionTask],
+          conditional_function: function() {
+            return assignedViewCondition === 'scroll';
+          },
+          data: {
+            is_practice: function() {
+              return jsPsych.timelineVariable('isPractice') || false;
+            }
+          }
+        },
+        // Position feedback only for scroll condition
+        {
+          timeline: [positionFeedback],
+          conditional_function: function() {
+            return assignedViewCondition === 'scroll';
+          }
+        },
         // Search feedback for 'without-memory' condition comes at the end
         {
           timeline: [searchFeedback],
@@ -2468,6 +2741,25 @@
             return jsPsych.timelineVariable('memoryLoad') === 'with-memory';
           }
         },
+        // Position task only for scroll condition (after memory feedback) - in practice
+        {
+          timeline: [positionTask],
+          conditional_function: function() {
+            return assignedViewCondition === 'scroll';
+          },
+          data: {
+            is_practice: function() {
+              return jsPsych.timelineVariable('isPractice') || false;
+            }
+          }
+        },
+        // Position feedback only for scroll condition - in practice
+        {
+          timeline: [positionFeedback],
+          conditional_function: function() {
+            return assignedViewCondition === 'scroll';
+          }
+        },
         // Search feedback for 'without-memory' condition comes at the end
         {
           timeline: [searchFeedback],
@@ -2485,7 +2777,26 @@
         blankScreen,
         visualSearch,
         // Always show search feedback for practice (no memory component)
-        searchFeedback
+        searchFeedback,
+        // Position task only for scroll condition (after search feedback) - in practice without memory
+        {
+          timeline: [positionTask],
+          conditional_function: function() {
+            return assignedViewCondition === 'scroll';
+          },
+          data: {
+            is_practice: function() {
+              return jsPsych.timelineVariable('isPractice') || false;
+            }
+          }
+        },
+        // Position feedback only for scroll condition - in practice without memory
+        {
+          timeline: [positionFeedback],
+          conditional_function: function() {
+            return assignedViewCondition === 'scroll';
+          }
+        }
       ]
     };
 
