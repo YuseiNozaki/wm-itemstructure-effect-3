@@ -294,6 +294,10 @@
     // Position task variables (for scroll condition)
     let originalTargetPosition = { x: 0, y: 0 };
     let searchAreaDimensions = { width: 0, height: 0 };
+    
+    // Position task constants
+    const POSITION_TASK_SCALE_FACTOR = 0.5; // Scale down to 50% of original
+    const POSITION_TASK_CORRECT_THRESHOLD = 0.15; // 15% of diagonal length
 
     // Trial progress tracking variables
     let currentMainTrialNumber = 0;
@@ -2184,10 +2188,9 @@
         // Get the last visual search trial data to retrieve the original target position
         const searchData = jsPsych.data.get().filter({task: 'visual_search'}).last(1).values()[0];
         
-        // Calculate scaled dimensions (approximately 80% of screen size for the display)
-        const scaleFactor = 0.5; // Scale down to 50% of original
-        const displayWidth = Math.floor(searchAreaDimensions.width * scaleFactor);
-        const displayHeight = Math.floor(searchAreaDimensions.height * scaleFactor);
+        // Calculate scaled dimensions using the constant
+        const displayWidth = Math.floor(searchAreaDimensions.width * POSITION_TASK_SCALE_FACTOR);
+        const displayHeight = Math.floor(searchAreaDimensions.height * POSITION_TASK_SCALE_FACTOR);
         
         let html = '<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; box-sizing: border-box;">';
         
@@ -2224,7 +2227,6 @@
         const statusText = document.getElementById('position-status');
         
         let selectedPosition = null;
-        const scaleFactor = 0.5;
         
         // Get the display area dimensions
         const displayWidth = responseArea.offsetWidth;
@@ -2255,9 +2257,9 @@
         // Submit button handler
         submitBtn.addEventListener('click', function() {
           if (selectedPosition) {
-            // Convert display coordinates back to original search area coordinates
-            const answeredX = selectedPosition.x / scaleFactor;
-            const answeredY = selectedPosition.y / scaleFactor;
+            // Convert display coordinates back to original search area coordinates using the constant
+            const answeredX = selectedPosition.x / POSITION_TASK_SCALE_FACTOR;
+            const answeredY = selectedPosition.y / POSITION_TASK_SCALE_FACTOR;
             
             // Get the original target position
             const originalX = originalTargetPosition.x;
@@ -2268,13 +2270,12 @@
             const dy = answeredY - originalY;
             const euclideanDistance = Math.sqrt(dx * dx + dy * dy);
             
-            // Determine correctness based on distance threshold
-            // Threshold: 15% of the diagonal of the search area
+            // Determine correctness based on distance threshold using the constant
             const diagonalLength = Math.sqrt(
               searchAreaDimensions.width * searchAreaDimensions.width + 
               searchAreaDimensions.height * searchAreaDimensions.height
             );
-            const correctThreshold = diagonalLength * 0.15;
+            const correctThreshold = diagonalLength * POSITION_TASK_CORRECT_THRESHOLD;
             const isCorrect = euclideanDistance <= correctThreshold;
             
             jsPsych.finishTrial({
@@ -2299,13 +2300,12 @@
         const positionData = jsPsych.data.get().filter({task: 'position_task'}).last(1).values()[0];
         const isCorrect = positionData.position_correct === 1;
         
-        // Calculate current position task accuracy (excluding practice trials)
+        // Calculate current position task accuracy (all position tasks so far)
         let positionAccuracyText = '';
-        const allPositionData = jsPsych.data.get().filter({task: 'position_task', is_practice: false});
+        const allPositionScores = jsPsych.data.get().filter({task: 'position_task'}).select('position_correct').values;
         
-        if (allPositionData.count() > 0) {
-          const positionScores = allPositionData.select('position_correct').values;
-          const validScores = positionScores.filter(score => score !== undefined && score !== null);
+        if (allPositionScores && allPositionScores.length > 0) {
+          const validScores = allPositionScores.filter(score => score !== undefined && score !== null);
           if (validScores.length > 0) {
             const avgAccuracy = validScores.reduce((a, b) => a + b, 0) / validScores.length;
             const accuracyPercent = Math.round(avgAccuracy * 100);
