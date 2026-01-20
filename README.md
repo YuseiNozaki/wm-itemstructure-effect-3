@@ -1,4 +1,4 @@
-# wm-itemstructure-effect-2
+# wm-itemstructure-effect-3
 
 視覚的ワーキングメモリと物体配置構造が視覚探索に与える影響を検証する心理学実験
 
