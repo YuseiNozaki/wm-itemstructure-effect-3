@@ -1962,45 +1962,59 @@
           positions.splice(originalTargetIndex, 1);
         }
       } else {
-        // Unstructured condition - random positions
-        let attempts = 0;
-        const maxAttempts = 50; // Prevent infinite loops
+        // Unstructured condition - grid-based random positions
+        // Divide the area into a 5×5 grid, and place each object at a random position within its cell
+        const gridSize = 5;
+        const cellWidth = area.width / gridSize;
+        const cellHeight = area.height / gridSize;
         
-        do {
-          targetX = Math.random() * (area.width - avgObjectSize * 2) + avgObjectSize;
-          targetY = Math.random() * (area.height - avgObjectSize * 2) + avgObjectSize;
-          attempts++;
-        } while (isPractice && (viewCondition === 'window' || viewCondition === 'scroll') && 
-                 isTargetInInitialWindow(targetX, targetY) && attempts < maxAttempts);
+        // Padding to keep objects from touching cell edges
+        const padding = avgObjectSize / 2;
         
-        // Generate random positions for distractors
-        for (let i = 0; i < params.numObjects - 1; i++) {
-          let x, y, overlapping;
+        // Generate all cell positions (25 cells for 25 objects)
+        let allCellPositions = [];
+        for (let i = 0; i < gridSize; i++) {
+          for (let j = 0; j < gridSize; j++) {
+            // Generate a random position within this cell
+            const cellLeft = i * cellWidth + padding;
+            const cellRight = (i + 1) * cellWidth - padding;
+            const cellTop = j * cellHeight + padding;
+            const cellBottom = (j + 1) * cellHeight - padding;
+            
+            // Ensure the random range is valid
+            const x = cellLeft + Math.random() * Math.max(0, cellRight - cellLeft);
+            const y = cellTop + Math.random() * Math.max(0, cellBottom - cellTop);
+            
+            allCellPositions.push({ x: x, y: y, cellIndex: i * gridSize + j });
+          }
+        }
+        
+        // Shuffle the positions to randomize which cell gets the target
+        allCellPositions = jsPsych.randomization.shuffle(allCellPositions);
+        
+        // For practice trials, filter out positions that would be in the initial window for target selection
+        let availableTargetPositions = allCellPositions;
+        if (isPractice && (viewCondition === 'window' || viewCondition === 'scroll')) {
+          availableTargetPositions = allCellPositions.filter(pos => !isTargetInInitialWindow(pos.x, pos.y));
           
-          do {
-            x = Math.random() * (area.width - avgObjectSize * 2) + avgObjectSize;
-            y = Math.random() * (area.height - avgObjectSize * 2) + avgObjectSize;
-            
-            // Check if too close to target
-            const dx = x - targetX;
-            const dy = y - targetY;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            overlapping = distance < avgObjectSize;
-            
-            // Check if too close to other positions
-            for (let j = 0; j < positions.length && !overlapping; j++) {
-              const dx = x - positions[j].x;
-              const dy = y - positions[j].y;
-              const distance = Math.sqrt(dx * dx + dy * dy);
-              
-              if (distance < avgObjectSize) {
-                overlapping = true;
-              }
-            }
-          } while (overlapping);
-          
-          positions.push({x: x, y: y});
+          // If no positions are available outside the window, use all positions as fallback
+          if (availableTargetPositions.length === 0) {
+            availableTargetPositions = allCellPositions;
+          }
+        }
+        
+        // Select target position from available positions
+        const targetPositionIndex = Math.floor(Math.random() * availableTargetPositions.length);
+        const targetPos = availableTargetPositions[targetPositionIndex];
+        targetX = targetPos.x;
+        targetY = targetPos.y;
+        
+        // Remove the target position from all positions and use remaining for distractors
+        const targetCellIndex = targetPos.cellIndex;
+        for (let i = 0; i < allCellPositions.length; i++) {
+          if (allCellPositions[i].cellIndex !== targetCellIndex) {
+            positions.push({ x: allCellPositions[i].x, y: allCellPositions[i].y });
+          }
         }
       }
       
