@@ -228,6 +228,7 @@
       // Objects
       numObjects: 25, // Total number of objects per trial
       objectSize: 40, // Fixed size for all objects
+      poissonDiscRadius: 100, // Minimum distance between objects for Poisson disc sampling (in pixels)
       
       // Target detection tolerance
       targetTolerance: 0.8, // Additional tolerance as multiplier of object size (0.8 = 80% of object size)
@@ -1962,45 +1963,113 @@
           positions.splice(originalTargetIndex, 1);
         }
       } else {
-        // Unstructured condition - random positions
+        // Unstructured condition - Poisson disc sampling for more even distribution
+        const minRadius = params.poissonDiscRadius; // Minimum distance between points
+        const maxRadius = minRadius * 2; // Maximum distance for new point generation
+        const numCandidates = 30; // Number of candidate points to try per active point
+        const maxFallbackAttempts = 1000; // Maximum attempts for fallback random placement
+        
+        // Bounds for placement (with padding for object size)
+        const padding = avgObjectSize;
+        const minX = padding;
+        const maxX = area.width - padding;
+        const minY = padding;
+        const maxY = area.height - padding;
+        
+        // Helper function to check if a position is valid
+        function isValidPosition(x, y, allPositions, minDist) {
+          // Check bounds
+          if (x < minX || x > maxX || y < minY || y > maxY) {
+            return false;
+          }
+          // Check distance to all existing positions
+          for (let i = 0; i < allPositions.length; i++) {
+            const dx = x - allPositions[i].x;
+            const dy = y - allPositions[i].y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < minDist) {
+              return false;
+            }
+          }
+          return true;
+        }
+        
+        // Generate a random point within an annulus (ring) around a given point
+        function generatePointInAnnulus(centerX, centerY, minR, maxR) {
+          const angle = Math.random() * 2 * Math.PI;
+          const r = Math.sqrt(Math.random() * (maxR * maxR - minR * minR) + minR * minR);
+          return {
+            x: centerX + r * Math.cos(angle),
+            y: centerY + r * Math.sin(angle)
+          };
+        }
+        
+        // Poisson disc sampling algorithm
+        let allPositions = []; // All generated positions
+        let activeList = []; // Points that can still spawn new points
+        
+        // Generate the first point (target position)
         let attempts = 0;
-        const maxAttempts = 50; // Prevent infinite loops
+        const maxAttempts = 100;
         
         do {
-          targetX = Math.random() * (area.width - avgObjectSize * 2) + avgObjectSize;
-          targetY = Math.random() * (area.height - avgObjectSize * 2) + avgObjectSize;
+          targetX = Math.random() * (maxX - minX) + minX;
+          targetY = Math.random() * (maxY - minY) + minY;
           attempts++;
         } while (isPractice && (viewCondition === 'window' || viewCondition === 'scroll') && 
                  isTargetInInitialWindow(targetX, targetY) && attempts < maxAttempts);
         
-        // Generate random positions for distractors
-        for (let i = 0; i < params.numObjects - 1; i++) {
-          let x, y, overlapping;
+        // Add target to the positions and active list
+        allPositions.push({x: targetX, y: targetY});
+        activeList.push({x: targetX, y: targetY});
+        
+        // Generate remaining positions using Poisson disc sampling
+        while (allPositions.length < params.numObjects && activeList.length > 0) {
+          // Pick a random point from the active list
+          const activeIndex = Math.floor(Math.random() * activeList.length);
+          const activePoint = activeList[activeIndex];
           
-          do {
-            x = Math.random() * (area.width - avgObjectSize * 2) + avgObjectSize;
-            y = Math.random() * (area.height - avgObjectSize * 2) + avgObjectSize;
+          let pointAdded = false;
+          
+          // Try to generate a new point around the active point
+          for (let k = 0; k < numCandidates; k++) {
+            const candidate = generatePointInAnnulus(activePoint.x, activePoint.y, minRadius, maxRadius);
             
-            // Check if too close to target
-            const dx = x - targetX;
-            const dy = y - targetY;
-            const distance = Math.sqrt(dx * dx + dy * dy);
+            // Use the larger of objectSize and minRadius for minimum spacing between objects
+            const minObjectSpacing = Math.max(avgObjectSize, minRadius);
             
-            overlapping = distance < avgObjectSize;
-            
-            // Check if too close to other positions
-            for (let j = 0; j < positions.length && !overlapping; j++) {
-              const dx = x - positions[j].x;
-              const dy = y - positions[j].y;
-              const distance = Math.sqrt(dx * dx + dy * dy);
-              
-              if (distance < avgObjectSize) {
-                overlapping = true;
-              }
+            if (isValidPosition(candidate.x, candidate.y, allPositions, minObjectSpacing)) {
+              allPositions.push(candidate);
+              activeList.push(candidate);
+              pointAdded = true;
+              break;
             }
-          } while (overlapping);
+          }
           
-          positions.push({x: x, y: y});
+          // If no valid point was found, remove the active point from the list
+          if (!pointAdded) {
+            activeList.splice(activeIndex, 1);
+          }
+        }
+        
+        // If Poisson disc didn't generate enough points, fill remaining with random placement
+        if (allPositions.length < params.numObjects) {
+          let fallbackCount = 0;
+          
+          while (allPositions.length < params.numObjects && fallbackCount < maxFallbackAttempts) {
+            const x = Math.random() * (maxX - minX) + minX;
+            const y = Math.random() * (maxY - minY) + minY;
+            
+            if (isValidPosition(x, y, allPositions, avgObjectSize)) {
+              allPositions.push({x: x, y: y});
+            }
+            fallbackCount++;
+          }
+        }
+        
+        // Copy positions (excluding target which is first) to the positions array for distractors
+        for (let i = 1; i < allPositions.length; i++) {
+          positions.push(allPositions[i]);
         }
       }
       
