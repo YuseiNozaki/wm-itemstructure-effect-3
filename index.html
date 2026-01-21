@@ -13,7 +13,11 @@
   <script src="https://unpkg.com/@jspsych/plugin-survey-multi-choice@1"></script>
   <link href="https://unpkg.com/jspsych@7/css/jspsych.css" rel="stylesheet" type="text/css" />
   <link href="styles.css" rel="stylesheet" type="text/css" />
+
+  <!--
   <script type="text/javascript" src="lib/jspsych-7-pavlovia-2022.1.1.js"></script>
+  -->
+
 </head>
 <body>
   <script>
@@ -303,6 +307,7 @@
     let currentMainTrialNumber = 0;
     const totalMainTrials = 60; // 1 viewCondition × 2 structures × 15 trialsPerCondition × 2 blocks
 
+    
     /* init connection with pavlovia.org */
     const pavlovia_init = {
       type: jsPsychPavlovia,
@@ -2870,7 +2875,7 @@
 
     // Full experiment timeline
     const timeline = [
-      pavlovia_init,
+      //pavlovia_init,
       welcome,
       informedConsent,
       demographics,
@@ -2885,7 +2890,7 @@
       secondBlockProcedure,
       resultScreen,
       finalScreen,
-      pavlovia_finish,
+      //pavlovia_finish,
       completionScreen
     ];
 
