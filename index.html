@@ -293,6 +293,22 @@
     // Target and distractor objects
     let objects = [];
     let targetObject = null;
+    
+    // Blank cell tracking for blank_5 and blank_10 conditions
+    let blankCellInfo = {
+      blankCellSet: new Set(),
+      gridSize: 5,
+      cellWidth: 0,
+      cellHeight: 0
+    };
+    
+    // Blank cell dwell time tracking
+    let blankCellDwellTime = 0;
+    let lastBlankCheckTime = 0;
+    
+    // Scroll offset tracking for scroll condition
+    let scrollOffsetX = 0;
+    let scrollOffsetY = 0;
 
     // Trial progress tracking variables
     let currentMainTrialNumber = 0;
@@ -1014,6 +1030,26 @@
         // Start timer
         const startTime = performance.now();
         
+        // Reset blank cell dwell time tracking
+        blankCellDwellTime = 0;
+        lastBlankCheckTime = startTime;
+        
+        // Set up periodic blank cell visibility check (every 50ms)
+        let blankCellCheckInterval = null;
+        if (viewCondition !== 'fullscreen' && (structure === 'blank_5' || structure === 'blank_10')) {
+          blankCellCheckInterval = setInterval(() => {
+            updateBlankCellDwellTime(performance.now(), viewCondition);
+          }, 50);
+        }
+        
+        // Store interval reference for cleanup
+        const cleanupBlankCellInterval = () => {
+          if (blankCellCheckInterval !== null) {
+            clearInterval(blankCellCheckInterval);
+            blankCellCheckInterval = null;
+          }
+        };
+        
         // Define instruction management functions in outer scope
         let hideInstruction = function() {};
         let showInstruction = function() {};
@@ -1178,6 +1214,9 @@
             
             // Update canvas clip region
             drawSearchDisplay(ctx, viewCondition);
+            
+            // Update blank cell dwell time
+            updateBlankCellDwellTime(performance.now(), viewCondition);
           }
         }
         
@@ -1231,12 +1270,19 @@
               objects[i].y += dy;
             }
             
+            // Track scroll offset for blank cell visibility calculation
+            scrollOffsetX += dx;
+            scrollOffsetY += dy;
+            
             // Update last position
             lastMouseX = mouseX;
             lastMouseY = mouseY;
             
             // Redraw
             drawSearchDisplay(ctx, viewCondition);
+            
+            // Update blank cell dwell time
+            updateBlankCellDwellTime(performance.now(), viewCondition);
           }
         }
         
@@ -1299,6 +1345,16 @@
           const correct = clickedObject === targetObject;
           const rt = performance.now() - startTime;
           
+          // Final update of blank cell dwell time and cleanup interval
+          cleanupBlankCellInterval();
+          updateBlankCellDwellTime(performance.now(), viewCondition);
+          
+          // Calculate layout entropy
+          const layoutEntropy = calculateLayoutEntropy(searchArea, objects);
+          
+          // Calculate blank cell dwell time ratio (0 for fullscreen or when rt is 0)
+          const blankCellDwellRatio = rt > 0 ? blankCellDwellTime / rt : 0;
+          
           // Remove event listeners
           if (viewCondition === 'window') {
             searchWindow.removeEventListener('mousedown', startWindowDrag);
@@ -1347,7 +1403,10 @@
             total_movement: totalMovement,
             mouse_path: mousePath,
             task: 'visual_search',
-            is_practice: isPractice
+            is_practice: isPractice,
+            blank_cell_dwell_time: blankCellDwellTime,
+            blank_cell_dwell_ratio: blankCellDwellRatio,
+            layout_entropy: layoutEntropy
           };
           
           // Only save data if not in practice mode
@@ -1365,6 +1424,18 @@
     function generateObjects(area, targetColor, targetShape, structure, viewCondition, isPractice) {
       objects = [];
       let positions = [];
+      
+      // Reset blank cell info (will be populated for blank_5 and blank_10)
+      blankCellInfo = {
+        blankCellSet: new Set(),
+        gridSize: 5,
+        cellWidth: area.width / 5,
+        cellHeight: area.height / 5
+      };
+      
+      // Reset scroll offset
+      scrollOffsetX = 0;
+      scrollOffsetY = 0;
       
       // Use fixed object size for positioning calculations (to avoid overlaps)
       const avgObjectSize = params.objectSize;
@@ -1511,6 +1582,14 @@
         const blankCellIndices = jsPsych.randomization.sampleWithoutReplacement(allCellIndices, numBlankCells);
         const blankCellSet = new Set(blankCellIndices);
         
+        // Store blank cell info for dwell time tracking
+        blankCellInfo = {
+          blankCellSet: blankCellSet,
+          gridSize: gridSize,
+          cellWidth: cellWidth,
+          cellHeight: cellHeight
+        };
+        
         // Helper function to check if a position is inside a blank cell
         function isInBlankCell(x, y) {
           const cellCol = Math.floor(x / cellWidth);
@@ -1636,6 +1715,144 @@
           isTarget: false
         });
       }
+    }
+
+    // Calculate layout entropy based on object positions in a 5x5 grid
+    // E = -sum_i(n_i * log(n_i)) where n_i is the count of shapes in cell i
+    // Note: For scroll condition, we need to use original positions (subtract scrollOffset)
+    function calculateLayoutEntropy(area, objectsList) {
+      const gridSize = 5;
+      const cellWidth = area.width / gridSize;
+      const cellHeight = area.height / gridSize;
+      
+      // Count objects per cell (based on object center position)
+      const cellCounts = new Array(gridSize * gridSize).fill(0);
+      
+      for (let i = 0; i < objectsList.length; i++) {
+        const obj = objectsList[i];
+        // Use original positions (subtract scroll offset for scroll condition)
+        const originalX = obj.x - scrollOffsetX;
+        const originalY = obj.y - scrollOffsetY;
+        
+        const cellCol = Math.floor(originalX / cellWidth);
+        const cellRow = Math.floor(originalY / cellHeight);
+        
+        // Clamp to valid grid range
+        const clampedCol = Math.max(0, Math.min(gridSize - 1, cellCol));
+        const clampedRow = Math.max(0, Math.min(gridSize - 1, cellRow));
+        const cellIndex = clampedCol * gridSize + clampedRow;
+        
+        cellCounts[cellIndex]++;
+      }
+      
+      // Calculate entropy: E = -sum_i(n_i * log(n_i))
+      // Note: We use log base e (natural log) and handle n_i = 0 (0 * log(0) = 0 by convention)
+      let entropy = 0;
+      for (let i = 0; i < cellCounts.length; i++) {
+        const n = cellCounts[i];
+        if (n > 0) {
+          entropy -= n * Math.log(n);
+        }
+      }
+      
+      return entropy;
+    }
+
+    // Check if any blank cell is visible in the window (more than 50% of cell area visible)
+    // Returns true if at least one blank cell is more than 50% visible
+    function isBlankCellVisible(viewCondition) {
+      // Only relevant for window and scroll conditions with blank cells
+      if (viewCondition === 'fullscreen' || blankCellInfo.blankCellSet.size === 0) {
+        return false;
+      }
+      
+      const searchWindow = document.getElementById('search-window');
+      if (!searchWindow) return false;
+      
+      const windowRect = searchWindow.getBoundingClientRect();
+      const gridSize = blankCellInfo.gridSize;
+      const cellWidth = blankCellInfo.cellWidth;
+      const cellHeight = blankCellInfo.cellHeight;
+      
+      // For scroll condition, we need to calculate the offset of the objects
+      // The objects have been moved, so we need to determine the current viewport position
+      let offsetX = 0;
+      let offsetY = 0;
+      
+      if (viewCondition === 'scroll' && objects.length > 0 && targetObject) {
+        // Calculate how much the objects have moved from their original positions
+        // We track this by comparing original target position (stored) with current position
+        // For scroll, objects move, so we need to determine the viewport offset
+        // The cell positions are in original screen coordinates
+        // Objects have been translated, so cell positions need the same translation
+        
+        // Actually, for scroll condition, the objects move relative to their original positions
+        // The blank cells are defined in the original coordinate system
+        // We need to offset the blank cell positions by the same amount objects have moved
+        offsetX = 0;
+        offsetY = 0;
+      }
+      
+      // Check each blank cell for visibility
+      for (const cellIndex of blankCellInfo.blankCellSet) {
+        const cellCol = Math.floor(cellIndex / gridSize);
+        const cellRow = cellIndex % gridSize;
+        
+        // Calculate cell boundaries in screen coordinates
+        let cellLeft = cellCol * cellWidth + offsetX;
+        let cellRight = cellLeft + cellWidth;
+        let cellTop = cellRow * cellHeight + offsetY;
+        let cellBottom = cellTop + cellHeight;
+        
+        // For scroll condition, adjust cell position based on object movement
+        if (viewCondition === 'scroll' && objects.length > 0) {
+          // The first object's original position was determined during generation
+          // We can estimate the scroll offset by comparing where objects are now vs original grid
+          // Since all objects move together, we can use any object to estimate the offset
+          // However, we need to track the original positions - let's use a simpler approach:
+          // The visible area in original coordinates is the area that would be visible
+          // after reverse-translating by the scroll amount
+          
+          // For scroll, the window is fixed at center, but objects move
+          // So to check if a blank cell is visible, we need to see if the cell
+          // (after being translated with the objects) intersects the window
+          
+          // We'll track scroll offset in the generateObjects function
+          cellLeft += scrollOffsetX;
+          cellRight += scrollOffsetX;
+          cellTop += scrollOffsetY;
+          cellBottom += scrollOffsetY;
+        }
+        
+        // Calculate intersection area
+        const intersectLeft = Math.max(cellLeft, windowRect.left);
+        const intersectRight = Math.min(cellRight, windowRect.right);
+        const intersectTop = Math.max(cellTop, windowRect.top);
+        const intersectBottom = Math.min(cellBottom, windowRect.bottom);
+        
+        if (intersectRight > intersectLeft && intersectBottom > intersectTop) {
+          const intersectionArea = (intersectRight - intersectLeft) * (intersectBottom - intersectTop);
+          const cellArea = cellWidth * cellHeight;
+          
+          // Check if more than 50% of the cell is visible
+          if (intersectionArea > cellArea * 0.5) {
+            return true;
+          }
+        }
+      }
+      
+      return false;
+    }
+
+    // Update blank cell dwell time based on current visibility
+    function updateBlankCellDwellTime(currentTime, viewCondition) {
+      const isVisible = isBlankCellVisible(viewCondition);
+      
+      if (isVisible && lastBlankCheckTime > 0) {
+        blankCellDwellTime += currentTime - lastBlankCheckTime;
+      }
+      
+      lastBlankCheckTime = currentTime;
     }
 
     // Draw search display based on view condition
