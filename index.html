@@ -232,6 +232,9 @@
       // Target detection tolerance
       targetTolerance: 0.8, // Additional tolerance as multiplier of object size (0.8 = 80% of object size)
       
+      // Placement
+      maxPlacementAttempts: 10000, // Maximum attempts for random placement to avoid infinite loops
+      
       // Colors and shapes
       colors: ['red', 'blue', 'green', 'yellow', 'purple'],
       shapes: ['circle', 'triangle', 'square', 'diamond'],
@@ -1528,7 +1531,7 @@
         // Generate 25 random positions, ensuring no overlaps and avoiding blank cell centers
         const allPositions = [];
         const minDistance = avgObjectSize; // Minimum distance between object centers to avoid overlap
-        let maxAttempts = 10000;
+        const maxAttempts = params.maxPlacementAttempts;
         let attempts = 0;
         
         while (allPositions.length < params.numObjects && attempts < maxAttempts) {
