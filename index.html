@@ -253,9 +253,14 @@
     }
 
     // Trial factors
+    // Structure conditions:
+    // - 'structured': aligned grid layout (整列)
+    // - 'aligned_random': 5×5 grid with random position within each cell (整列ランダム)
+    // - 'blank_5': 5 random blank cells, 25 objects in remaining space (空白5個)
+    // - 'blank_10': 10 random blank cells, 25 objects in remaining space (空白10個)
     const factors = {
       viewCondition: ['window', 'scroll', 'fullscreen'],
-      structure: ['structured', 'unstructured']
+      structure: ['structured', 'aligned_random', 'blank_5', 'blank_10']
     };
 
     // Between-subjects random assignment of viewCondition
@@ -288,7 +293,7 @@
 
     // Trial progress tracking variables
     let currentMainTrialNumber = 0;
-    const totalMainTrials = 30; // 1 viewCondition × 2 structures × 15 trialsPerCondition
+    const totalMainTrials = 60; // 1 viewCondition × 4 structures × 15 trialsPerCondition
 
     
     /* init connection with pavlovia.org */
@@ -1426,8 +1431,8 @@
         if (originalTargetIndex >= 0) {
           positions.splice(originalTargetIndex, 1);
         }
-      } else {
-        // Unstructured condition - grid-based random positions
+      } else if (structure === 'aligned_random') {
+        // Aligned random condition (整列ランダム) - grid-based random positions
         // Divide the area into a 5×5 grid, and place each object at a random position within its cell
         const gridSize = 5;
         const cellWidth = area.width / gridSize;
@@ -1479,6 +1484,103 @@
         for (let i = 0; i < allCellPositions.length; i++) {
           if (allCellPositions[i].cellIndex !== targetCellIndex) {
             positions.push({ x: allCellPositions[i].x, y: allCellPositions[i].y });
+          }
+        }
+      } else if (structure === 'blank_5' || structure === 'blank_10') {
+        // Blank cell conditions (空白5個 or 空白10個)
+        // Divide the area into a 5×5 grid, randomly select n cells to be blank,
+        // then randomly place 25 objects in the remaining space
+        const gridSize = 5;
+        const cellWidth = area.width / gridSize;
+        const cellHeight = area.height / gridSize;
+        const numBlankCells = structure === 'blank_5' ? 5 : 10;
+        
+        // Padding to keep objects from touching edges
+        const padding = avgObjectSize / 2;
+        
+        // Create list of all cell indices (0-24)
+        const allCellIndices = [];
+        for (let i = 0; i < gridSize * gridSize; i++) {
+          allCellIndices.push(i);
+        }
+        
+        // Randomly select blank cells
+        const blankCellIndices = jsPsych.randomization.sampleWithoutReplacement(allCellIndices, numBlankCells);
+        const blankCellSet = new Set(blankCellIndices);
+        
+        // Helper function to check if a position is inside a blank cell
+        function isInBlankCell(x, y) {
+          const cellCol = Math.floor(x / cellWidth);
+          const cellRow = Math.floor(y / cellHeight);
+          // Clamp to valid grid range
+          const clampedCol = Math.max(0, Math.min(gridSize - 1, cellCol));
+          const clampedRow = Math.max(0, Math.min(gridSize - 1, cellRow));
+          const cellIndex = clampedCol * gridSize + clampedRow;
+          return blankCellSet.has(cellIndex);
+        }
+        
+        // Calculate the valid placement area (overall area with padding)
+        const minX = padding;
+        const maxX = area.width - padding;
+        const minY = padding;
+        const maxY = area.height - padding;
+        
+        // Generate 25 random positions, ensuring no overlaps and avoiding blank cell centers
+        const allPositions = [];
+        const minDistance = avgObjectSize; // Minimum distance between object centers to avoid overlap
+        let maxAttempts = 10000;
+        let attempts = 0;
+        
+        while (allPositions.length < params.numObjects && attempts < maxAttempts) {
+          attempts++;
+          
+          // Generate random position within the valid area
+          const x = minX + Math.random() * (maxX - minX);
+          const y = minY + Math.random() * (maxY - minY);
+          
+          // Check if this position's center is in a blank cell
+          if (isInBlankCell(x, y)) {
+            continue;
+          }
+          
+          // Check for overlap with existing positions
+          let hasOverlap = false;
+          for (let i = 0; i < allPositions.length; i++) {
+            const dx = x - allPositions[i].x;
+            const dy = y - allPositions[i].y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < minDistance) {
+              hasOverlap = true;
+              break;
+            }
+          }
+          
+          if (!hasOverlap) {
+            allPositions.push({ x: x, y: y });
+          }
+        }
+        
+        // For practice trials, filter out positions that would be in the initial window for target selection
+        let availableTargetPositions = allPositions;
+        if (isPractice && (viewCondition === 'window' || viewCondition === 'scroll')) {
+          availableTargetPositions = allPositions.filter(pos => !isTargetInInitialWindow(pos.x, pos.y));
+          
+          // If no positions are available outside the window, use all positions as fallback
+          if (availableTargetPositions.length === 0) {
+            availableTargetPositions = allPositions;
+          }
+        }
+        
+        // Select target position from available positions
+        const targetPositionIndex = Math.floor(Math.random() * availableTargetPositions.length);
+        const targetPos = availableTargetPositions[targetPositionIndex];
+        targetX = targetPos.x;
+        targetY = targetPos.y;
+        
+        // Use remaining positions for distractors
+        for (let i = 0; i < allPositions.length; i++) {
+          if (allPositions[i].x !== targetPos.x || allPositions[i].y !== targetPos.y) {
+            positions.push({ x: allPositions[i].x, y: allPositions[i].y });
           }
         }
       }
@@ -1837,11 +1939,12 @@
     ];
 
     // Create factorial design for structure only (viewCondition is fixed to assigned condition)
+    // 4 structure conditions × 15 trials each = 60 total main trials
     const structureFactors = {
-      structure: ['structured', 'unstructured']
+      structure: ['structured', 'aligned_random', 'blank_5', 'blank_10']
     };
     
-    // Generate trial design - 15 trials per structure condition = 30 total
+    // Generate trial design - 15 trials per structure condition = 60 total
     const trialDesign = jsPsych.randomization.factorial(structureFactors, params.trialsPerCondition);
     trialDesign.forEach(trial => {
       trial.viewCondition = assignedViewCondition; // Use assigned view condition
