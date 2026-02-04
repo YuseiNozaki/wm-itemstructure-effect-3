@@ -305,7 +305,10 @@
     // Blank cell dwell time tracking
     let blankCellDwellTime = 0;
     let lastBlankCheckTime = 0;
-    let wasBlankCellVisible = false;
+    
+    // Scroll offset tracking for scroll condition
+    let scrollOffsetX = 0;
+    let scrollOffsetY = 0;
 
     // Trial progress tracking variables
     let currentMainTrialNumber = 0;
@@ -1029,8 +1032,7 @@
         
         // Reset blank cell dwell time tracking
         blankCellDwellTime = 0;
-        lastBlankCheckTime = performance.now();
-        wasBlankCellVisible = false;
+        lastBlankCheckTime = startTime;
         
         // Set up periodic blank cell visibility check (every 50ms)
         let blankCellCheckInterval = null;
@@ -1851,12 +1853,7 @@
       }
       
       lastBlankCheckTime = currentTime;
-      wasBlankCellVisible = isVisible;
     }
-
-    // Scroll offset tracking for scroll condition
-    let scrollOffsetX = 0;
-    let scrollOffsetY = 0;
 
     // Draw search display based on view condition
     function drawSearchDisplay(ctx, viewCondition) {
