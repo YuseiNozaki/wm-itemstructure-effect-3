@@ -1932,6 +1932,32 @@
       }
     };
 
+    // Break page shown after 30 trials (halfway point)
+    const breakPage = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: `
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px; text-align: center;">
+          <h1>休憩</h1>
+          <p style="font-size: 18px; margin: 20px 0;">半分終了です。</p>
+          <p style="font-size: 16px; margin: 20px 0;">
+            数分の休憩をとって構いません。<br>
+            準備ができましたら、次へボタンを押して後半を開始してください。
+          </p>
+          <div style="margin: 20px 0;">
+            <button id="break-next-btn" style="padding: 12px 24px; font-size: 16px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer;">次へ</button>
+          </div>
+        </div>
+      `,
+      choices: "NO_KEYS",
+      on_load: function() {
+        // Add click event listener to the Next button
+        const nextBtn = document.getElementById('break-next-btn');
+        nextBtn.addEventListener('click', function() {
+          jsPsych.finishTrial();
+        });
+      }
+    };
+
 
     // Generate practice trial variables
     // 3 trials total, all using the assigned view condition with structured placement
@@ -2006,11 +2032,23 @@
       }
     };
 
-    // Main block procedure
-    const mainBlockProcedure = {
+    // Shuffle trial design and split into two halves for break
+    const shuffledTrialDesign = jsPsych.randomization.shuffle(trialDesign);
+    const firstHalfTrials = shuffledTrialDesign.slice(0, 30);
+    const secondHalfTrials = shuffledTrialDesign.slice(30);
+
+    // First half block procedure (30 trials)
+    const firstHalfBlockProcedure = {
       ...trialProcedure,
-      timeline_variables: trialDesign,
-      randomize_order: true
+      timeline_variables: firstHalfTrials,
+      randomize_order: false // Already shuffled
+    };
+
+    // Second half block procedure (30 trials)
+    const secondHalfBlockProcedure = {
+      ...trialProcedure,
+      timeline_variables: secondHalfTrials,
+      randomize_order: false // Already shuffled
     };
 
     // Full experiment timeline (simplified without memory/position tasks)
@@ -2023,7 +2061,9 @@
       initialExplanation,
       practiceProcedure,
       mainExperimentStart,
-      mainBlockProcedure,
+      firstHalfBlockProcedure,
+      breakPage,
+      secondHalfBlockProcedure,
       resultScreen,
       finalScreen,
       //pavlovia_finish,
